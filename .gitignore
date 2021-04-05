@@ -1,0 +1,37 @@
+# Object files
+*.o
+*.elf
+*.d
+*.lst
+*.map
+*.def
+*.htm
+*.html
+*.axf
+*.crf
+*.uvgui.*
+*.OutJob
+*._2i
+*.fed
+*.l2p
+*.log
+*.uvguix.*
+*.dep
+*.lnp
+*.iex
+
+
+# Executables
+*.exe
+*.app
+*.bin
+*.hex
+
+
+# folder
+.vscode
+History
+.vs
+Debug
+
+
