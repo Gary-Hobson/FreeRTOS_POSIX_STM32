@@ -11,7 +11,7 @@
 >
 > 硬件 ：
 >
-> STM32F103ZET6  
+> STM32F103ZET6
 >
 > 内部RC 64M 、串口波特率 115200
 >
@@ -25,7 +25,7 @@
 
 **整体架构图：**
 
-![](./Doc/picture/POSIX.jpg) 
+![](./Document/Picture/POSIX.jpg)
 
 ## FreeRTOS_POSIX_STM32
 

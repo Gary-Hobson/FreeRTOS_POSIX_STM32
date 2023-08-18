@@ -87,7 +87,6 @@ void HAL_IncTick(void)
 
 void LedTask(void *pvParameters)
 {
-
   while (1)
   {
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
