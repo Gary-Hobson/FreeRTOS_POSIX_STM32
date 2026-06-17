@@ -786,12 +786,14 @@ static void prvDemonstrateTaskStateAndHandleGetFunctions( void )
                 xErrorCount++;
             }
 
-            /* Now delete the task and check its state is reported correctly. */
+            /* Now delete the task and check it is no longer findable.  This task
+             * is not deleting itself, so the TCB can be freed immediately.  Do
+             * not query the deleted task handle after this point. */
             vTaskDelete( xTestTask );
 
-            if( eTaskStateGet( xTestTask ) != eDeleted )
+            if( xTaskGetHandle( "Test" ) != NULL )
             {
-                pcStatusMessage = "Error: Returned test task state was incorrect 3";
+                pcStatusMessage = "Error: Deleted test task handle was still findable";
                 xErrorCount++;
             }
         }
