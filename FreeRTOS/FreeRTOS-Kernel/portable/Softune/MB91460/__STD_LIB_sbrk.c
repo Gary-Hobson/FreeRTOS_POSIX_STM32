@@ -1,6 +1,6 @@
 /*
- * FreeRTOS Kernel V10.4.4
- * Copyright (C) 2021 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
+ * FreeRTOS Kernel V11.3.0
+ * Copyright (C) 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * SPDX-License-Identifier: MIT
  *
@@ -32,24 +32,24 @@
 /*                 (C) Fujitsu Microelectronics Europe GmbH                  */
 /*---------------------------------------------------------------------------
   __STD_LIB_sbrk.C
-  - Used by heap_3.c for memory accocation and deletion.
+  - Used by heap_3.c for memory allocation and deletion.
 
 /*---------------------------------------------------------------------------*/
 
 #include "FreeRTOSConfig.h"
 #include <stdlib.h>
 
-	static  long         brk_siz  =  0;
-	typedef int          _heep_t;
-	#define ROUNDUP(s)   (((s)+sizeof(_heep_t)-1)&~(sizeof(_heep_t)-1))
-	static  _heep_t      _heep[ROUNDUP(configTOTAL_HEAP_SIZE)/sizeof(_heep_t)];
-	#define              _heep_size      ROUNDUP(configTOTAL_HEAP_SIZE)
+    static  long         brk_siz  =  0;
+    typedef int          _heep_t;
+    #define ROUNDUP(s)   (((s)+sizeof(_heep_t)-1)&~(sizeof(_heep_t)-1))
+    static  _heep_t      _heep[ROUNDUP(configTOTAL_HEAP_SIZE)/sizeof(_heep_t)];
+    #define              _heep_size      ROUNDUP(configTOTAL_HEAP_SIZE)
 
-	extern  char  *sbrk(int  size)
-	{
-	   if  (brk_siz  +  size  >  _heep_size  ||  brk_siz  +  size  <  0)
+    extern  char  *sbrk(int  size)
+    {
+       if  (brk_siz  +  size  >  _heep_size  ||  brk_siz  +  size  <  0)
 
           return((char*)-1);
-	   brk_siz  +=  size;
-	   return(  (char*)_heep  +  brk_siz  -  size);
-	}
+       brk_siz  +=  size;
+       return(  (char*)_heep  +  brk_siz  -  size);
+    }

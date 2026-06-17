@@ -1,30 +1,32 @@
 /*
- * FreeRTOS Kernel V10.4.4
- * Copyright (C) 2003-2015 Cadence Design Systems, Inc.
- * Copyright (C) 2021 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
+ * SPDX-FileCopyrightText: 2015-2019 Cadence Design Systems, Inc.
  *
  * SPDX-License-Identifier: MIT
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
+ * SPDX-FileContributor: 2016-2022 Espressif Systems (Shanghai) CO LTD
+ */
+
+/*
+ * Copyright (c) 2015-2019 Cadence Design Systems, Inc.
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
  *
- * https://www.FreeRTOS.org
- * https://github.com/FreeRTOS
- *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 /*******************************************************************************
@@ -39,17 +41,19 @@
 *******************************************************************************/
 
 #ifndef XTENSA_CONFIG_H
-    #define XTENSA_CONFIG_H
+#define XTENSA_CONFIG_H
 
-    #ifdef __cplusplus
-        extern "C" {
-    #endif
+/* *INDENT-OFF* */
+#ifdef __cplusplus
+    extern "C" {
+#endif
+/* *INDENT-ON* */
 
-    #include <xtensa/hal.h>
-    #include <xtensa/config/core.h>
-    #include <xtensa/config/system.h> /* required for XSHAL_CLIB */
+#include <xtensa/hal.h>
+#include <xtensa/config/core.h>
+#include <xtensa/config/system.h> /* required for XSHAL_CLIB */
 
-    #include "xtensa_context.h"
+#include "xtensa_context.h"
 
 
 /*-----------------------------------------------------------------------------
@@ -102,27 +106,27 @@
  *  -----------------------------------------------------------------------------*/
 
 /* Extra space required for interrupt/exception hooks. */
-    #ifdef XT_INTEXC_HOOKS
-        #ifdef __XTENSA_CALL0_ABI__
-            #define STK_INTEXC_EXTRA     0x200
-        #else
-            #define STK_INTEXC_EXTRA     0x180
-        #endif
+#ifdef XT_INTEXC_HOOKS
+    #ifdef __XTENSA_CALL0_ABI__
+        #define STK_INTEXC_EXTRA     0x200
     #else
-        #define STK_INTEXC_EXTRA         0
+        #define STK_INTEXC_EXTRA     0x180
     #endif
+#else
+    #define STK_INTEXC_EXTRA         0
+#endif
 
-    #define XT_CLIB_CONTEXT_AREA_SIZE    0
+#define XT_CLIB_CONTEXT_AREA_SIZE    0
 
 /*------------------------------------------------------------------------------
  *  Extra size -- interrupt frame plus coprocessor save area plus hook space.
  *  NOTE: Make sure XT_INTEXC_HOOKS is undefined unless you really need the hooks.
  *  ------------------------------------------------------------------------------*/
-    #ifdef __XTENSA_CALL0_ABI__
-        #define XT_XTRA_SIZE    ( XT_STK_FRMSZ + STK_INTEXC_EXTRA + 0x10 + XT_CP_SIZE )
-    #else
-        #define XT_XTRA_SIZE    ( XT_STK_FRMSZ + STK_INTEXC_EXTRA + 0x20 + XT_CP_SIZE )
-    #endif
+#ifdef __XTENSA_CALL0_ABI__
+    #define XT_XTRA_SIZE    ( XT_STK_FRMSZ + STK_INTEXC_EXTRA + 0x10 + XT_CP_SIZE )
+#else
+    #define XT_XTRA_SIZE    ( XT_STK_FRMSZ + STK_INTEXC_EXTRA + 0x20 + XT_CP_SIZE )
+#endif
 
 /*------------------------------------------------------------------------------
  *  Space allocated for user code -- function calls and local variables.
@@ -132,22 +136,23 @@
  *  NOTE: The windowed ABI requires more stack, since space has to be reserved
  *  for spilling register windows.
  *  ------------------------------------------------------------------------------*/
-    #ifdef __XTENSA_CALL0_ABI__
-        #define XT_USER_SIZE    0x200
-    #else
-        #define XT_USER_SIZE    0x400
-    #endif
+#ifdef __XTENSA_CALL0_ABI__
+    #define XT_USER_SIZE    0x200
+#else
+    #define XT_USER_SIZE    0x400
+#endif
 
 /* Minimum recommended stack size. */
-    #define XT_STACK_MIN_SIZE      ( ( XT_XTRA_SIZE + XT_USER_SIZE ) / sizeof( unsigned char ) )
+#define XT_STACK_MIN_SIZE      ( ( XT_XTRA_SIZE + XT_USER_SIZE ) / sizeof( unsigned char ) )
 
 /* OS overhead with and without C library thread context. */
-    #define XT_STACK_EXTRA         ( XT_XTRA_SIZE )
-    #define XT_STACK_EXTRA_CLIB    ( XT_XTRA_SIZE + XT_CLIB_CONTEXT_AREA_SIZE )
+#define XT_STACK_EXTRA         ( XT_XTRA_SIZE )
+#define XT_STACK_EXTRA_CLIB    ( XT_XTRA_SIZE + XT_CLIB_CONTEXT_AREA_SIZE )
 
-
-    #ifdef __cplusplus
-        }
-    #endif
+/* *INDENT-OFF* */
+#ifdef __cplusplus
+    }
+#endif
+/* *INDENT-ON* */
 
 #endif /* XTENSA_CONFIG_H */

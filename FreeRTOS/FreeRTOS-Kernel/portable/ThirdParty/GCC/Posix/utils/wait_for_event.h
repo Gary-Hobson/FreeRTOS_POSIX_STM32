@@ -1,6 +1,6 @@
 /*
- * FreeRTOS Kernel V10.4.4
- * Copyright (C) 2021 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
+ * FreeRTOS Kernel V11.3.0
+ * Copyright (C) 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * SPDX-License-Identifier: MIT
  *
@@ -26,15 +26,15 @@
  *
  */
 
-#ifndef _WAIT_FOR_EVENT_H_
-#define _WAIT_FOR_EVENT_H_
+#ifndef WAIT_FOR_EVENT_H_
+#define WAIT_FOR_EVENT_H_
 
 #include <stdbool.h>
 #include <time.h>
 
 struct event;
 
-struct event * event_create();
+struct event * event_create( void );
 void event_delete( struct event * );
 bool event_wait( struct event * ev );
 bool event_wait_timed( struct event * ev,
@@ -43,4 +43,4 @@ void event_signal( struct event * ev );
 
 
 
-#endif /* ifndef _WAIT_FOR_EVENT_H_ */
+#endif /* ifndef WAIT_FOR_EVENT_H_ */

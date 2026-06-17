@@ -6,42 +6,46 @@ on:
     branches: [main]
   workflow_dispatch:
 jobs:
-  spell-check:
+  formatting:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Parent Repo
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v4.1.1
+      - name: Check Formatting of FreeRTOS-Kernel Files
+        uses: FreeRTOS/CI-CD-Github-Actions/formatting@main
         with:
-          ref: main
-          repository: aws/aws-iot-device-sdk-embedded-C
-          path: main
-      - name: Clone This Repo
-        uses: actions/checkout@v2
-        with:
-            path: ./kernel
-      - name: Install spell
-        run: |
-          sudo apt-get install spell
-          sudo apt-get install util-linux
-      - name: Check spelling
-        run: |
-          PATH=$PATH:main/tools/spell
-          # Make sure that the portable directory is not included in the spellcheck.
-          sed -i 's/find $DIRNAME/find $DIRNAME -not -path '*portable*'/g' main/tools/spell/find-unknown-comment-words
-          find-unknown-comment-words --directory kernel/ --lexicon ./kernel/.github/lexicon.txt
-          if [ "$?" = "0" ]; then
-            exit 0
-          else
-            exit 1
-          fi
-  url-check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clone This Repo
-        uses: actions/checkout@v2
-        with:
-            path: ./kernel
-      - name: URL Checker
-        run: |
-            bash kernel/.github/actions/url_verifier.sh kernel
+          exclude-dirs: portable
 
+  spell-check:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Clone This Repo
+          uses: actions/checkout@v4.1.1
+        - name: Run spellings check
+          uses: FreeRTOS/CI-CD-Github-Actions/spellings@main
+          with:
+            path: ./
+            exclude-files: History.txt
+
+  link-verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone This Repo
+        uses: actions/checkout@v4.1.1
+      - name: Link Verification
+        uses: FreeRTOS/CI-CD-Github-Actions/link-verifier@main
+        with:
+          allowlist-file: '.github/allowed_urls.txt'
+
+  verify-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.1.1
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Run manifest verifier
+        uses: FreeRTOS/CI-CD-GitHub-Actions/manifest-verifier@main
+        with:
+          path: ./
+          fail-on-incorrect-version: true

@@ -1,24 +1,68 @@
 CC                    := gcc
-BIN                   := freertos_simulator
+BIN                   := posix_demo
 
 BUILD_DIR             := ./build
 BUILD_DIR_ABS         := $(abspath $(BUILD_DIR))
 
-KERNEL_DIR            := ../../FreeRTOS/FreeRTOS-Kernel
+FREERTOS_DIR_REL      := ../../FreeRTOS
+FREERTOS_DIR          := $(abspath $(FREERTOS_DIR_REL))
+
+FREERTOS_PLUS_DIR_REL := ../../FreeRTOS-Plus
+FREERTOS_PLUS_DIR     := $(abspath $(FREERTOS_PLUS_DIR_REL))
+
+KERNEL_DIR            := ${FREERTOS_DIR}/FreeRTOS-Kernel
+
+# This repository does not vendor FreeRTOS-Plus-Trace. Keep tracing optional.
+NO_TRACING            ?= 1
 
 INCLUDE_DIRS          := -I.
+INCLUDE_DIRS          += -I./Trace_Recorder_Configuration
 INCLUDE_DIRS          += -I${KERNEL_DIR}/include
 INCLUDE_DIRS          += -I${KERNEL_DIR}/portable/ThirdParty/GCC/Posix
 INCLUDE_DIRS          += -I${KERNEL_DIR}/portable/ThirdParty/GCC/Posix/utils
+INCLUDE_DIRS          += -I${FREERTOS_DIR}/Demo/Common/include
+INCLUDE_DIRS          += -I${FREERTOS_PLUS_DIR}/Source/FreeRTOS-Plus-Trace/include
+INCLUDE_DIRS          += -I${FREERTOS_PLUS_DIR}/Source/FreeRTOS-Plus-Trace/config
+INCLUDE_DIRS          += -I${FREERTOS_PLUS_DIR}/Source/FreeRTOS-Plus-Trace/streamports/File/include
+INCLUDE_DIRS          += -I${FREERTOS_PLUS_DIR}/Source/FreeRTOS-Plus-Trace/streamports/File/config
+INCLUDE_DIRS          += -I${FREERTOS_PLUS_DIR}/Source/FreeRTOS-Plus-Trace/kernelports/FreeRTOS/include
+INCLUDE_DIRS          += -I${FREERTOS_PLUS_DIR}/Source/FreeRTOS-Plus-Trace/kernelports/FreeRTOS/
 
-SOURCE_FILES          := main.c main_blinky.c console.c
+SOURCE_FILES          := $(wildcard *.c)
 SOURCE_FILES          += $(wildcard ${KERNEL_DIR}/*.c)
-
 # Memory manager (use malloc() / free() )
 SOURCE_FILES          += ${KERNEL_DIR}/portable/MemMang/heap_3.c
 # posix port
 SOURCE_FILES          += ${KERNEL_DIR}/portable/ThirdParty/GCC/Posix/utils/wait_for_event.c
 SOURCE_FILES          += ${KERNEL_DIR}/portable/ThirdParty/GCC/Posix/port.c
+
+# Demo library.
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/AbortDelay.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/BlockQ.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/blocktim.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/countsem.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/death.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/dynamic.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/EventGroupsDemo.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/flop.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/GenQTest.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/integer.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/IntSemTest.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/MessageBufferAMP.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/MessageBufferDemo.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/PollQ.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/QPeek.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/QueueOverwrite.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/QueueSet.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/QueueSetPolling.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/recmutex.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/semtest.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/StaticAllocation.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/StreamBufferDemo.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/StreamBufferInterrupt.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/TaskNotify.c
+SOURCE_FILES          += ${FREERTOS_DIR}/Demo/Common/Minimal/TimerDemo.c
+
 
 
 CFLAGS                :=    -ggdb3
@@ -26,24 +70,55 @@ LDFLAGS               :=    -ggdb3 -pthread
 CPPFLAGS              :=    $(INCLUDE_DIRS) -DBUILD_DIR=\"$(BUILD_DIR_ABS)\"
 CPPFLAGS              +=    -D_WINDOWS_
 
-CPPFLAGS              += -DTRACE_ON_ENTER=1
-CPPFLAGS              += -DprojCOVERAGE_TEST=1
-SANITIZE_LEAK = 1
-SANITIZE_ADDRESS = 1
+ifeq ($(TRACE_ON_ENTER),1)
+  CPPFLAGS              += -DTRACE_ON_ENTER=1
+else
+  CPPFLAGS              += -DTRACE_ON_ENTER=0
+endif
 
-CFLAGS              +=    -O0
+ifeq ($(COVERAGE_TEST),1)
+  CPPFLAGS              += -DprojCOVERAGE_TEST=1
+  CPPFLAGS              += -DprojENABLE_TRACING=0
+  CFLAGS                += -Werror
+else
+  ifeq ($(NO_TRACING),1)
+    CPPFLAGS              += -DprojENABLE_TRACING=0
+  else
+    CPPFLAGS              += -DprojENABLE_TRACING=1
+    # Trace Library.
+    SOURCE_FILES          += ${FREERTOS_PLUS_DIR}/Source/FreeRTOS-Plus-Trace/kernelports/FreeRTOS/trcKernelPort.c
+    SOURCE_FILES          += $(wildcard ${FREERTOS_PLUS_DIR}/Source/FreeRTOS-Plus-Trace/*.c )
+  endif
+  CPPFLAGS              += -DprojCOVERAGE_TEST=0
+endif
 
-CFLAGS              +=   -fsanitize=address -fsanitize=alignment
-LDFLAGS             +=   -fsanitize=address -fsanitize=alignment
+ifdef PROFILE
+  CFLAGS              +=   -pg  -O0
+  LDFLAGS             +=   -pg  -O0
+else
+  CFLAGS              +=   -O3
+  LDFLAGS             +=   -O3
+endif
 
-LDFLAGS             +=   -fsanitize=leak
+ifdef SANITIZE_ADDRESS
+  CFLAGS              +=   -fsanitize=address -fsanitize=alignment
+  LDFLAGS             +=   -fsanitize=address -fsanitize=alignment
+endif
 
-CPPFLAGS            +=   -DUSER_DEMO=0
+ifdef SANITIZE_LEAK
+  LDFLAGS             +=   -fsanitize=leak
+endif
+
+ifeq ($(USER_DEMO),BLINKY_DEMO)
+  CPPFLAGS            +=   -DUSER_DEMO=0
+endif
+
+ifeq ($(USER_DEMO),FULL_DEMO)
+  CPPFLAGS            +=   -DUSER_DEMO=1
+endif
 
 
-vpath %.c $(sort $(dir $(SOURCE_FILES)))
-
-OBJ_FILES = $(addprefix $(BUILD_DIR)/, $(notdir $(SOURCE_FILES:%.c=%.o)))
+OBJ_FILES = $(SOURCE_FILES:%.c=$(BUILD_DIR)/%.o)
 
 DEP_FILE = $(OBJ_FILES:%.o=%.d)
 
@@ -56,24 +131,16 @@ ${BUILD_DIR}/${BIN} : ${OBJ_FILES}
 -include ${DEP_FILE}
 
 ${BUILD_DIR}/%.o : %.c Makefile
-	@-mkdir -p $(@D)  $(@D)/files
-	@echo $<
+	-mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -c $< -o $@
-
 
 .PHONY: clean
 
 clean:
-	-rm -rf $(BUILD_DIR) result
+	-rm -rf $(BUILD_DIR)
 
 
 GPROF_OPTIONS := --directory-path=$(INCLUDE_DIRS)
 profile:
 	gprof -a -p --all-lines $(GPROF_OPTIONS) $(BUILD_DIR)/$(BIN) $(BUILD_DIR)/gmon.out > $(BUILD_DIR)/prof_flat.txt
 	gprof -a --graph $(GPROF_OPTIONS) $(BUILD_DIR)/$(BIN) $(BUILD_DIR)/gmon.out > $(BUILD_DIR)/prof_call_graph.txt
-	gprof2dot $(BUILD_DIR)/prof_call_graph.txt -n0 -e0 | dot -Tpng -o prof_call_graph.png
-	gprof2dot $(BUILD_DIR)/prof_flat.txt -n0 -e0 | dot -Tpng -o prof_flat.png
-
-gcov:
-	lcov -c -d . -o ${BIN}.info --rc lcov_branch_coverage=1
-	genhtml --branch-coverage -o result ${BIN}.info

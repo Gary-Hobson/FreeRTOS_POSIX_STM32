@@ -1,6 +1,6 @@
 /*
- * FreeRTOS V202107.00
- * Copyright (C) 2020 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
+ * FreeRTOS V202212.00
+ * Copyright (C) 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -82,7 +82,7 @@
 
 #include <stdio.h>
 #include <pthread.h>
-#include <stdlib.h>
+
 /* Kernel includes. */
 #include "FreeRTOS.h"
 #include "task.h"
@@ -195,9 +195,9 @@ static void prvQueueSendTask( void * pvParameters )
     for( ; ; )
     {
         /* Place this task in the blocked state until it is time to run again.
-        *  The block time is specified in ticks, pdMS_TO_TICKS() was used to
-        *  convert a time specified in milliseconds into a time specified in ticks.
-        *  While in the Blocked state this task will not consume any CPU time. */
+         *  The block time is specified in ticks, pdMS_TO_TICKS() was used to
+         *  convert a time specified in milliseconds into a time specified in ticks.
+         *  While in the Blocked state this task will not consume any CPU time. */
         vTaskDelayUntil( &xNextWakeTime, xBlockTime );
 
         /* Send to the queue - causing the queue receive task to unblock and
@@ -231,7 +231,7 @@ static void prvQueueSendTimerCallback( TimerHandle_t xTimerHandle )
 static void prvQueueReceiveTask( void * pvParameters )
 {
     uint32_t ulReceivedValue;
-    int cnt = 0;
+
     /* Prevent the compiler warning about the unused parameter. */
     ( void ) pvParameters;
 
@@ -260,10 +260,6 @@ static void prvQueueReceiveTask( void * pvParameters )
         else
         {
             console_print( "Unexpected message\n" );
-        }
-
-        if(cnt++ == 10){
-            exit(0);
         }
     }
 }

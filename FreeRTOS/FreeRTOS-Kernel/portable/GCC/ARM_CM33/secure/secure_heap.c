@@ -1,6 +1,6 @@
 /*
- * FreeRTOS Kernel V10.4.4
- * Copyright (C) 2021 Amazon.com, Inc. or its affiliates.  All Rights Reserved.
+ * FreeRTOS Kernel V11.3.0
+ * Copyright (C) 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * SPDX-License-Identifier: MIT
  *
@@ -29,6 +29,9 @@
 /* Standard includes. */
 #include <stdint.h>
 
+/* Configuration includes. */
+#include "FreeRTOSConfig.h"
+
 /* Secure context heap includes. */
 #include "secure_heap.h"
 
@@ -38,7 +41,9 @@
 /**
  * @brief Total heap size.
  */
-#define secureconfigTOTAL_HEAP_SIZE    ( ( ( size_t ) ( 10 * 1024 ) ) )
+#ifndef secureconfigTOTAL_HEAP_SIZE
+    #define secureconfigTOTAL_HEAP_SIZE    ( ( ( size_t ) ( 10 * 1024 ) ) )
+#endif
 
 /* No test marker by default. */
 #ifndef mtCOVERAGE_TEST_MARKER
@@ -60,6 +65,22 @@
 
 /* Assumes 8bit bytes! */
 #define secureheapBITS_PER_BYTE         ( ( size_t ) 8 )
+
+/* Max value that fits in a size_t type. */
+#define secureheapSIZE_MAX              ( ~( ( size_t ) 0 ) )
+
+/* Check if adding a and b will result in overflow. */
+#define secureheapADD_WILL_OVERFLOW( a, b )    ( ( a ) > ( secureheapSIZE_MAX - ( b ) ) )
+
+/* MSB of the xBlockSize member of an BlockLink_t structure is used to track
+ * the allocation status of a block.  When MSB of the xBlockSize member of
+ * an BlockLink_t structure is set then the block belongs to the application.
+ * When the bit is free the block is still part of the free heap space. */
+#define secureheapBLOCK_ALLOCATED_BITMASK    ( ( ( size_t ) 1 ) << ( ( sizeof( size_t ) * secureheapBITS_PER_BYTE ) - 1 ) )
+#define secureheapBLOCK_SIZE_IS_VALID( xBlockSize )    ( ( ( xBlockSize ) & secureheapBLOCK_ALLOCATED_BITMASK ) == 0 )
+#define secureheapBLOCK_IS_ALLOCATED( pxBlock )        ( ( ( pxBlock->xBlockSize ) & secureheapBLOCK_ALLOCATED_BITMASK ) != 0 )
+#define secureheapALLOCATE_BLOCK( pxBlock )            ( ( pxBlock->xBlockSize ) |= secureheapBLOCK_ALLOCATED_BITMASK )
+#define secureheapFREE_BLOCK( pxBlock )                ( ( pxBlock->xBlockSize ) &= ~secureheapBLOCK_ALLOCATED_BITMASK )
 /*-----------------------------------------------------------*/
 
 /* Allocate the memory for the heap. */
@@ -111,7 +132,8 @@ static const size_t xHeapStructSize = ( sizeof( BlockLink_t ) + ( ( size_t ) ( s
 /**
  * @brief Create a couple of list links to mark the start and end of the list.
  */
-static BlockLink_t xStart, * pxEnd = NULL;
+static BlockLink_t xStart;
+static BlockLink_t * pxEnd = NULL;
 
 /**
  * @brief Keeps track of the number of free bytes remaining, but says nothing
@@ -120,14 +142,6 @@ static BlockLink_t xStart, * pxEnd = NULL;
 static size_t xFreeBytesRemaining = 0U;
 static size_t xMinimumEverFreeBytesRemaining = 0U;
 
-/**
- * @brief Gets set to the top bit of an size_t type.
- *
- * When this bit in the xBlockSize member of an BlockLink_t structure is set
- * then the block belongs to the application. When the bit is free the block is
- * still part of the free heap space.
- */
-static size_t xBlockAllocatedBit = 0;
 /*-----------------------------------------------------------*/
 
 static void prvHeapInit( void )
@@ -172,9 +186,6 @@ static void prvHeapInit( void )
     /* Only one block exists - and it covers the entire usable heap space. */
     xMinimumEverFreeBytesRemaining = pxFirstFreeBlock->xBlockSize;
     xFreeBytesRemaining = pxFirstFreeBlock->xBlockSize;
-
-    /* Work out the position of the top bit in a size_t variable. */
-    xBlockAllocatedBit = ( ( size_t ) 1 ) << ( ( sizeof( size_t ) * secureheapBITS_PER_BYTE ) - 1 );
 }
 /*-----------------------------------------------------------*/
 
@@ -226,7 +237,7 @@ static void prvInsertBlockIntoFreeList( BlockLink_t * pxBlockToInsert )
         pxBlockToInsert->pxNextFreeBlock = pxIterator->pxNextFreeBlock;
     }
 
-    /* If the block being inserted plugged a gab, so was merged with the block
+    /* If the block being inserted plugged a gap, so was merged with the block
      * before and the block after, then it's pxNextFreeBlock pointer will have
      * already been set, and should not be set here as that would make it point
      * to itself. */
@@ -243,8 +254,12 @@ static void prvInsertBlockIntoFreeList( BlockLink_t * pxBlockToInsert )
 
 void * pvPortMalloc( size_t xWantedSize )
 {
-    BlockLink_t * pxBlock, * pxPreviousBlock, * pxNewBlockLink;
+    BlockLink_t * pxBlock;
+    BlockLink_t * pxPreviousBlock;
+    BlockLink_t * pxNewBlockLink;
     void * pvReturn = NULL;
+    size_t xAdditionalRequiredSize;
+    size_t xAllocatedBlockSize = 0;
 
     /* If this is the first call to malloc then the heap will require
      * initialisation to setup the list of free blocks. */
@@ -257,25 +272,29 @@ void * pvPortMalloc( size_t xWantedSize )
         mtCOVERAGE_TEST_MARKER();
     }
 
-    /* Check the requested block size is not so large that the top bit is set.
-     * The top bit of the block size member of the BlockLink_t structure is used
-     * to determine who owns the block - the application or the kernel, so it
-     * must be free. */
-    if( ( xWantedSize & xBlockAllocatedBit ) == 0 )
+    if( xWantedSize > 0 )
     {
-        /* The wanted size is increased so it can contain a BlockLink_t
+        /* The wanted size must be increased so it can contain a BlockLink_t
          * structure in addition to the requested amount of bytes. */
-        if( xWantedSize > 0 )
+        if( secureheapADD_WILL_OVERFLOW( xWantedSize, xHeapStructSize ) == 0 )
         {
             xWantedSize += xHeapStructSize;
 
-            /* Ensure that blocks are always aligned to the required number of
-             * bytes. */
+            /* Ensure that blocks are always aligned to the required number
+             * of bytes. */
             if( ( xWantedSize & secureportBYTE_ALIGNMENT_MASK ) != 0x00 )
             {
                 /* Byte alignment required. */
-                xWantedSize += ( secureportBYTE_ALIGNMENT - ( xWantedSize & secureportBYTE_ALIGNMENT_MASK ) );
-                secureportASSERT( ( xWantedSize & secureportBYTE_ALIGNMENT_MASK ) == 0 );
+                xAdditionalRequiredSize = secureportBYTE_ALIGNMENT - ( xWantedSize & secureportBYTE_ALIGNMENT_MASK );
+
+                if( secureheapADD_WILL_OVERFLOW( xWantedSize, xAdditionalRequiredSize ) == 0 )
+                {
+                    xWantedSize += xAdditionalRequiredSize;
+                }
+                else
+                {
+                    xWantedSize = 0;
+                }
             }
             else
             {
@@ -284,9 +303,20 @@ void * pvPortMalloc( size_t xWantedSize )
         }
         else
         {
-            mtCOVERAGE_TEST_MARKER();
+            xWantedSize = 0;
         }
+    }
+    else
+    {
+        mtCOVERAGE_TEST_MARKER();
+    }
 
+    /* Check the requested block size is not so large that the top bit is set.
+     * The top bit of the block size member of the BlockLink_t structure is used
+     * to determine who owns the block - the application or the kernel, so it
+     * must be free. */
+    if( secureheapBLOCK_SIZE_IS_VALID( xWantedSize ) != 0 )
+    {
         if( ( xWantedSize > 0 ) && ( xWantedSize <= xFreeBytesRemaining ) )
         {
             /* Traverse the list from the start (lowest address) block until
@@ -329,7 +359,8 @@ void * pvPortMalloc( size_t xWantedSize )
                     pxBlock->xBlockSize = xWantedSize;
 
                     /* Insert the new block into the list of free blocks. */
-                    prvInsertBlockIntoFreeList( pxNewBlockLink );
+                    pxNewBlockLink->pxNextFreeBlock = pxPreviousBlock->pxNextFreeBlock;
+                    pxPreviousBlock->pxNextFreeBlock = pxNewBlockLink;
                 }
                 else
                 {
@@ -347,9 +378,11 @@ void * pvPortMalloc( size_t xWantedSize )
                     mtCOVERAGE_TEST_MARKER();
                 }
 
+                xAllocatedBlockSize = pxBlock->xBlockSize;
+
                 /* The block is being returned - it is allocated and owned by
                  * the application and has no "next" block. */
-                pxBlock->xBlockSize |= xBlockAllocatedBit;
+                secureheapALLOCATE_BLOCK( pxBlock );
                 pxBlock->pxNextFreeBlock = NULL;
             }
             else
@@ -367,20 +400,23 @@ void * pvPortMalloc( size_t xWantedSize )
         mtCOVERAGE_TEST_MARKER();
     }
 
-    traceMALLOC( pvReturn, xWantedSize );
+    traceMALLOC( pvReturn, xAllocatedBlockSize );
+
+    /* Prevent compiler warnings when trace macros are not used. */
+    ( void ) xAllocatedBlockSize;
 
     #if ( secureconfigUSE_MALLOC_FAILED_HOOK == 1 )
+    {
+        if( pvReturn == NULL )
         {
-            if( pvReturn == NULL )
-            {
-                extern void vApplicationMallocFailedHook( void );
-                vApplicationMallocFailedHook();
-            }
-            else
-            {
-                mtCOVERAGE_TEST_MARKER();
-            }
+            extern void vApplicationMallocFailedHook( void );
+            vApplicationMallocFailedHook();
         }
+        else
+        {
+            mtCOVERAGE_TEST_MARKER();
+        }
+    }
     #endif /* if ( secureconfigUSE_MALLOC_FAILED_HOOK == 1 ) */
 
     secureportASSERT( ( ( ( size_t ) pvReturn ) & ( size_t ) secureportBYTE_ALIGNMENT_MASK ) == 0 );
@@ -403,16 +439,16 @@ void vPortFree( void * pv )
         pxLink = ( void * ) puc;
 
         /* Check the block is actually allocated. */
-        secureportASSERT( ( pxLink->xBlockSize & xBlockAllocatedBit ) != 0 );
+        secureportASSERT( secureheapBLOCK_IS_ALLOCATED( pxLink ) != 0 );
         secureportASSERT( pxLink->pxNextFreeBlock == NULL );
 
-        if( ( pxLink->xBlockSize & xBlockAllocatedBit ) != 0 )
+        if( secureheapBLOCK_IS_ALLOCATED( pxLink ) != 0 )
         {
             if( pxLink->pxNextFreeBlock == NULL )
             {
                 /* The block is being returned to the heap - it is no longer
                  * allocated. */
-                pxLink->xBlockSize &= ~xBlockAllocatedBit;
+                secureheapFREE_BLOCK( pxLink );
 
                 secureportDISABLE_NON_SECURE_INTERRUPTS();
                 {
@@ -445,11 +481,5 @@ size_t xPortGetFreeHeapSize( void )
 size_t xPortGetMinimumEverFreeHeapSize( void )
 {
     return xMinimumEverFreeBytesRemaining;
-}
-/*-----------------------------------------------------------*/
-
-void vPortInitialiseBlocks( void )
-{
-    /* This just exists to keep the linker quiet. */
 }
 /*-----------------------------------------------------------*/
